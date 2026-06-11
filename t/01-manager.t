@@ -4325,6 +4325,44 @@ SH
 }
 
 {
+    # DD-384: a streamed line that renders the same accumulated verbose text must
+    # NOT trigger an editMessageText with unchanged text (Telegram returns
+    # 400 "message is not modified"); the reporter skips the no-op edit and stays
+    # enabled so later distinct lines still update in place.
+    my @post_calls;
+    my $manager = new_manager(
+        post_runner => sub {
+            my ( $method, $params ) = @_;
+            push @post_calls, [ $method, $params ];
+            die "Telegram POST failed for editMessageText: 400 Bad Request\n"
+              if $method eq 'editMessageText'
+              && @post_calls > 1
+              && $params->{text} eq $post_calls[0][1]{text};
+            return {
+                ok     => JSON::XS::true,
+                result => { message_id => 661, chat => { id => $params->{chat_id} }, text => $params->{text} },
+            };
+        },
+    );
+    my @errors;
+    my $reporter = $manager->start_listener_verbose_reporter(
+        {
+            update_id  => 30021,
+            message_id => 321,
+            chat       => { id => 88, type => 'private' },
+            text       => 'Finish all tasks with all gates',
+        },
+        on_error => sub { push @errors, $_[0]; return 1; },
+    );
+    ok( $reporter->{emit}->('Session resumed'), 'reporter sends the first verbose line' );
+    ok( $reporter->{emit}->('Session resumed'), 'reporter skips the no-op edit when the accumulated text is unchanged' );
+    ok( $reporter->{emit}->('Agent: Today is June 11, 2026.'), 'reporter still edits in place for a later distinct line' );
+    is( scalar(@errors), 0, 'reporter records no error because the unchanged-text edit was skipped, not attempted' );
+    is( scalar( grep { $_->[0] eq 'editMessageText' } @post_calls ), 1, 'reporter issues exactly one editMessageText (only for the changed text), not for the duplicate' );
+    is( $post_calls[0][0], 'sendMessage', 'reporter sent the initial trace message' );
+}
+
+{
     my $runtime = tempdir( CLEANUP => 1 );
     my @errors;
     my @post_calls;
@@ -6473,7 +6511,7 @@ EOF
         <<"EOF"
 #!/bin/sh
 if [ "\$1" = "list-panes" ]; then
-  printf '%%118\t/dev/pts/77\tnode\n'
+  printf '%%118|/dev/pts/77|node\n'
   exit 0
 fi
 if [ "\$1" = "send-keys" ]; then

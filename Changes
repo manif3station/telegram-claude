@@ -1,5 +1,17 @@
 Revision history for telegram-claude
 
+0.02 2026-06-11
+  - DD-384: fixed the managed verbose-trace progress callback. editMessageText
+    returns 400 ("message is not modified") on unchanged text, which disabled
+    the whole in-chat trace; the reporter now skips the no-op edit when the
+    accumulated text is unchanged. Surfaced live in the noVNC E2E.
+  - DD-385: fixed live-pane discovery. tmux rewrites a literal tab in a `-F`
+    format to an underscore, so `tmux_pane_rows` split on `\t` collapsed every
+    pane into one field and dropped it, breaking discovery of the live
+    `claude --resume` TUI (and thus live-TUI injection / TUI->Telegram
+    mirroring). Switched the tmux format/split to a pipe separator tmux
+    preserves. Verified live against the real interactive Claude TUI.
+
 0.01 2026-06-11
   - Initial release of the telegram-claude skill, replicating the
     telegram-codex Telegram bridge runtime but driving the Claude Code CLI

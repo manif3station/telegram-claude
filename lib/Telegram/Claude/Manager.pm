@@ -3196,12 +3196,16 @@ sub tmux_pane_rows {
     if ( $self->{tmux_panes_runner} ) {
         return @{ $self->{tmux_panes_runner}->() || [] };
     }
-    open my $fh, '-|', 'tmux', 'list-panes', '-a', '-F', '#{pane_id}' . "\t" . '#{pane_tty}' . "\t" . '#{pane_current_command}'
+    # tmux rewrites a literal tab in a -F format to an underscore in its
+    # output, so a tab separator silently collapses every pane into one field
+    # (DD-385). Use a pipe, which tmux preserves and which never appears in a
+    # pane id (%N), tty (/dev/pts/N), or current command.
+    open my $fh, '-|', 'tmux', 'list-panes', '-a', '-F', '#{pane_id}|#{pane_tty}|#{pane_current_command}'
       or return ();
     my @rows;
     while ( my $line = <$fh> ) {
         chomp $line;
-        my ( $pane_id, $tty, $current_command ) = split /\t/, $line, 3;
+        my ( $pane_id, $tty, $current_command ) = split /\|/, $line, 3;
         next if !defined $pane_id || !defined $tty;
         push @rows, {
             pane_id         => $pane_id,
@@ -3605,6 +3609,7 @@ sub start_telegram_verbose_reporter {
     my $on_error = $args{on_error};
     my @lines;
     my $message_id;
+    my $last_text;
     my $disabled = 0;
     my $emit = sub {
         my ($line) = @_;
@@ -3635,8 +3640,10 @@ sub start_telegram_verbose_reporter {
                 return 0;
             }
             $message_id = $sent->{result}{message_id} if $sent && ref($sent) eq 'HASH' && $sent->{result};
+            $last_text  = $text;
             return 1;
         }
+        return 1 if defined $last_text && $text eq $last_text;
         my $ok = eval {
             $self->telegram_post(
                 'editMessageText',
@@ -3655,6 +3662,7 @@ sub start_telegram_verbose_reporter {
             $on_error->($error) if $on_error;
             return 0;
         }
+        $last_text = $text;
         return 1;
     };
     return {

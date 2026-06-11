@@ -98,11 +98,33 @@ docker run --rm -v ~/projects/skills/skills/telegram-claude:/workspace:rw ubuntu
     bypassed for the single-message run (`TELEGRAM_CLAUDE_DISABLE_PAIRING=1`) and
     pairing security itself is covered by the unit suite
   - the lab was stopped after the run
-- Known finding from the live run (follow-up, non-fatal): the managed
-  verbose-trace progress callback raised `Claude progress callback failed` on
-  each streamed line during the resumed reply. The skill correctly treats these
-  as non-fatal — the final reply was still generated and delivered
-  (`reply.sent`) — but the in-chat streaming verbose trace did not update
-  cleanly in this environment. This is a real-environment robustness issue the
-  mocked unit tests do not surface; it should be reproduced, root-caused, and
-  gated in a follow-up ticket.
+- Live-run findings, both root-caused and FIXED (real-environment bugs the
+  mocked unit tests could not surface):
+  - DD-384: the verbose-trace progress callback failed per line because
+    `editMessageText` returns `400` when the accumulated text is unchanged
+    (which happens when the kickoff line and first streamed line render
+    identically), disabling the whole trace. Fixed: the reporter skips the
+    no-op edit when the text is unchanged. Reproduced against the real bot,
+    fixed, covered.
+  - DD-385: live-pane discovery returned no panes because tmux rewrites a
+    literal tab in a `-F` format to an underscore, so `tmux_pane_rows` split on
+    `\t` collapsed every pane into one field (`tty` undefined → dropped).
+    Confirmed by hexdump (separator byte `0x5f`). Fixed by switching the tmux
+    format/split to a pipe separator. Verified live: `tmux_pane_rows` now
+    returns the pane and `resolve_claude_live_tmux_pane(<sid>)` resolves the
+    live `claude --resume` TUI pane (`%0`).
+- Live-TUI proof for the §6.2/§7 mechanism (2026-06-11, after DD-385):
+  - an interactive `claude --resume 342c650d…` was brought to its prompt inside
+    a tmux pane in the lab (past the Claude Code onboarding via a
+    `hasCompletedOnboarding` config flag, using the existing host credentials)
+  - the fixed bridge discovered that live pane (`live_pane=%0`)
+  - injecting a turn into the live pane via the bridge's `tmux send-keys`
+    mechanism ("What is 7 times 8?") produced a real Claude reply in the TUI
+    (`7 times 8 is 56.`), proving the live-injection path the DD-385 fix unblocks
+  - NOT completed: the Telegram half of the live §6.2/§7 demonstration (turn
+    arriving from Telegram appearing in the TUI, and TUI turns mirrored back to
+    Telegram). The headed Telegram Web session was lost during browser-profile
+    experimentation and a lab restart, and it cannot be re-logged-in
+    autonomously (QR login needs the operator's phone). The §6 managed-reply
+    round-trip was already proven live earlier; the remaining live §6.2/§7
+    Telegram-side demonstration is an operator-run step per the standing runbook.
