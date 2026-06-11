@@ -1,0 +1,45 @@
+services:
+  e2e:
+    build:
+      context: .
+      dockerfile: docker/e2e/Dockerfile
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
+    shm_size: 2gb
+    ports:
+      - "${TELEGRAM_CLAUDE_E2E_NOVNC_PORT}:6080"
+      - "${TELEGRAM_CLAUDE_E2E_VNC_PORT}:5900"
+    environment:
+      TELEGRAM_CLAUDE_E2E_ROLE: desktop
+      TELEGRAM_CLAUDE_E2E_WORKSPACE_PATH: ${TELEGRAM_CLAUDE_E2E_WORKSPACE_PATH}
+      TELEGRAM_CLAUDE_E2E_RUNTIME_USER: ${TELEGRAM_CLAUDE_E2E_RUNTIME_USER}
+      TELEGRAM_CLAUDE_E2E_HOST_UID: ${TELEGRAM_CLAUDE_E2E_HOST_UID}
+      TELEGRAM_CLAUDE_E2E_HOST_GID: ${TELEGRAM_CLAUDE_E2E_HOST_GID}
+      TELEGRAM_CLAUDE_E2E_NOVNC_PORT: ${TELEGRAM_CLAUDE_E2E_NOVNC_PORT}
+      TELEGRAM_CLAUDE_E2E_VNC_PORT: ${TELEGRAM_CLAUDE_E2E_VNC_PORT}
+      TELEGRAM_CLAUDE_E2E_CHROME_DEBUG_PORT: ${TELEGRAM_CLAUDE_E2E_CHROME_DEBUG_PORT}
+      TELEGRAM_CLAUDE_E2E_PLAYWRIGHT_WS_PATH: /playwright
+      TELEGRAM_CLAUDE_E2E_TELEGRAM_URL: ${TELEGRAM_CLAUDE_E2E_TELEGRAM_URL}
+    volumes:
+      - "${HOME}/.claude:/home/dashboard/.claude"
+      - "${TELEGRAM_CLAUDE_E2E_WORKSPACE_PATH}:${TELEGRAM_CLAUDE_E2E_WORKSPACE_PATH}"
+      - "${TELEGRAM_CLAUDE_E2E_CHROME_PROFILE_DIR}:/home/dashboard/.config/google-chrome-e2e"
+  playwright:
+    build:
+      context: .
+      dockerfile: docker/e2e/Dockerfile
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
+    shm_size: 2gb
+    ports:
+      - "${TELEGRAM_CLAUDE_E2E_CHROME_DEBUG_PORT}:9222"
+    environment:
+      TELEGRAM_CLAUDE_E2E_ROLE: playwright
+      TELEGRAM_CLAUDE_E2E_RUNTIME_HOME: /home/dashboard
+      TELEGRAM_CLAUDE_E2E_RUNTIME_ROOT: /tmp/telegram-claude-e2e
+      TELEGRAM_CLAUDE_E2E_CHROME_INTERNAL_PORT: 9222
+      TELEGRAM_CLAUDE_E2E_PLAYWRIGHT_WS_PATH: /playwright

@@ -1,0 +1,27 @@
+Revision history for telegram-claude
+
+0.01 2026-06-11
+  - Initial release of the telegram-claude skill, replicating the
+    telegram-codex Telegram bridge runtime but driving the Claude Code CLI
+    (`claude`) instead of the Codex CLI.
+  - Collector-owned Telegram polling through one DD collector per workspace
+    session, with single-owner getUpdates per bot token and token-scoped shared
+    poll roots under `~/.telegram-claude/.shared/<sha1(bot-token)>/`.
+  - Managed replies resume the saved Claude session with
+    `claude -p --resume <session-id> --output-format stream-json --verbose
+    --dangerously-skip-permissions` and stream real Claude stream-json events
+    (system/init, assistant text and tool_use, user tool_result, result) into
+    one in-place Telegram verbose trace.
+  - Live tmux session sharing targets `claude --resume <session-id>` processes
+    and the shared transcript is the Claude Code JSONL at
+    `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`.
+  - Pairing security: first unpaired Telegram message gets one local
+    `d2 telegram-claude.pair <hexcode>` challenge; only the paired chat can drive
+    the session afterward.
+  - Inbound media downloaded into the session runtime; downloaded photos and
+    image documents are referenced by local path in the prompt so the Claude
+    Read tool can open them.
+  - `dashboard telegram-claude.start --version` proxies the real
+    `claude --version` output without collector side effects.
+  - Docker noVNC E2E lab installs the Claude Code CLI
+    (`@anthropic-ai/claude-code`).
