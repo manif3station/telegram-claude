@@ -59,6 +59,22 @@ docker run --rm -v ~/projects/skills/skills/telegram-claude:/workspace:rw ubuntu
   - the E2E runtime resolves the installed Claude Code CLI from `PATH` (falling
     back to the `@anthropic-ai/claude-code/cli.js` module path) and launches the
     visible Claude terminal with `--dangerously-skip-permissions`
-- Note: the standing Telegram simulator E2E run (live noVNC desktop,
-  Telegram -> Claude -> Telegram and Claude -> Telegram) is performed after the
-  skill repository is pushed, per the workspace simulator E2E rule.
+- Docker noVNC E2E lab boot proof for `DD-383` (2026-06-11, after push):
+  - `dashboard telegram-claude.e2e start` built the lab from
+    `developer-dashboard:latest` and started both services (exit 0)
+  - the runtime container ran as uid `1000`, not `root`
+  - the Claude Code CLI was installed from `@anthropic-ai/claude-code` and
+    `claude --version` returned `2.1.173 (Claude Code)` inside the container
+  - host `~/.claude` was mounted into the container user home
+  - noVNC answered `200` on `http://127.0.0.1:25900/vnc.html`
+  - Playwright Chrome DevTools endpoint answered `Running` on
+    `http://127.0.0.1:29222/json/version`
+  - the lab was stopped with `dashboard telegram-claude.e2e stop` after the boot
+    proof
+- Remaining operator step: the live two-way propagation E2E (manual Telegram Web
+  login in the headed Chrome window, pair a Claude session, then prove
+  Telegram -> Claude -> Telegram and Claude -> Telegram with screenshot review)
+  is performed by an operator per the standing runbook at
+  `~/projects/skills/simulator/doc/telegram-claude/README.md`. It needs a
+  Telegram bot token and the manual headed-browser login, so it is not run
+  inside the automated `.t` suite.
