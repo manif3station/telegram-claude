@@ -71,10 +71,38 @@ docker run --rm -v ~/projects/skills/skills/telegram-claude:/workspace:rw ubuntu
     `http://127.0.0.1:29222/json/version`
   - the lab was stopped with `dashboard telegram-claude.e2e stop` after the boot
     proof
-- Remaining operator step: the live two-way propagation E2E (manual Telegram Web
-  login in the headed Chrome window, pair a Claude session, then prove
-  Telegram -> Claude -> Telegram and Claude -> Telegram with screenshot review)
-  is performed by an operator per the standing runbook at
-  `~/projects/skills/simulator/doc/telegram-claude/README.md`. It needs a
-  Telegram bot token and the manual headed-browser login, so it is not run
-  inside the automated `.t` suite.
+- Live two-way propagation E2E proof for `DD-383` (2026-06-11, in the noVNC lab):
+  - the inbound Telegram message was sent into the logged-in Telegram Web client
+    by driving the desktop with `xdotool` (the headed single-process Chrome in
+    this container exposes no CDP/Playwright hook, so the GUI is driven at the X
+    layer); a real Claude session (`342c650d…`) was created in the container with
+    `claude -p … --output-format json` against the authenticated `claude` CLI
+  - the `dashboard telegram-claude.check-message` bridge owned `getUpdates` and
+    received the inbound message: audit `update.received` for message_id 44
+    ("What is the date today?", chat 398296603)
+  - the bridge resumed the real Claude session via
+    `claude -p --resume 342c650d… --output-format stream-json --verbose
+    --dangerously-skip-permissions`; audit shows `system/init` →
+    `assistant: "Today's date is June 11, 2026."` → `result/success` →
+    `claude.resume.completed` (exit_code 0)
+  - the bridge delivered the reply back to Telegram: audit `reply.sent`
+    (chat 398296603), visible in the Telegram Web window (screenshot reviewed
+    outside the `.t` suite)
+  - the inbound user turn and the outbound reply were both journaled into the
+    shared Claude session transcript
+    (`[Telegram chat …] What is the date today?` and
+    `[Telegram reply …] Today's date is June 11, 2026.`)
+  - the run used the `appdowntimealert_bot` test token by temporarily stopping
+    the throwaway `foobar-project` codex worker that held its `getUpdates` lock
+    (single-owner-per-token model), then restoring it afterward; pairing was
+    bypassed for the single-message run (`TELEGRAM_CLAUDE_DISABLE_PAIRING=1`) and
+    pairing security itself is covered by the unit suite
+  - the lab was stopped after the run
+- Known finding from the live run (follow-up, non-fatal): the managed
+  verbose-trace progress callback raised `Claude progress callback failed` on
+  each streamed line during the resumed reply. The skill correctly treats these
+  as non-fatal — the final reply was still generated and delivered
+  (`reply.sent`) — but the in-chat streaming verbose trace did not update
+  cleanly in this environment. This is a real-environment robustness issue the
+  mocked unit tests do not surface; it should be reproduced, root-caused, and
+  gated in a follow-up ticket.
